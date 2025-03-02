@@ -1,35 +1,34 @@
 import Invoice from "../invoice/invoice.model.js";
-import Product from "../product/product.model.js"; // Importación para validar productos y actualizar stock
-import Cart from "../cart/cart.model.js"; // Importación para obtener los productos del carrito
+import Product from "../product/product.model.js"; // Import for product validation and stock update
+import Cart from "../cart/cart.model.js"; // Import to get products from the cart
 
-// Crear una nueva factura desde el carrito del usuario
-// Crear una nueva factura desde el carrito del usuario
+// Create a new invoice from the user's cart
 export const createInvoice = async (req, res) => {
     try {
-      // Usa el userId desde req.user (viene del middleware JWT)
-      const userId = req.user._id;  // Asegúrate de que req.user esté disponible
+      // Use the userId from req.user (comes from the JWT middleware)
+      const userId = req.user._id;  // Ensure req.user is available
   
-      // Obtener el carrito del usuario con los productos poblados
+      // Get the user's cart with populated products
       const cart = await Cart.findOne({ user: userId }).populate('items.product');
-      console.log('Carrito con productos:', cart);  // Añadir log para ver el carrito
+      console.log('Cart with products:', cart);  // Add log to see the cart
   
-      // Verificar si el carrito existe y contiene productos
+      // Check if the cart exists and contains products
       if (!cart || cart.items.length === 0) {
         return res.status(400).json({
           success: false,
-          message: "No hay productos en el carrito para crear una factura",
+          message: "There are no products in the cart to create an invoice",
         });
       }
   
-      // Calcular el monto total de la factura
+      // Calculate the total amount for the invoice
       const totalAmount = cart.items.reduce((total, item) => {
         if (item.product) {
-          return total + item.product.price * item.quantity; // Asegúrate de que quantity esté bien definido
+          return total + item.product.price * item.quantity; // Ensure quantity is properly defined
         }
         return total;
       }, 0);
   
-      // Crear la nueva factura
+      // Create the new invoice
       const newInvoice = new Invoice({
         user: userId,
         products: cart.items.map(item => ({
@@ -41,32 +40,31 @@ export const createInvoice = async (req, res) => {
   
       await newInvoice.save();
   
-      // Vaciar el carrito después de crear la factura
+      // Empty the cart after creating the invoice
       await Cart.findOneAndUpdate({ user: userId }, { items: [] });
   
       return res.status(201).json({
         success: true,
-        message: "Factura creada exitosamente",
+        message: "Invoice created successfully",
         invoice: newInvoice,
       });
     } catch (err) {
       console.error(err);
       return res.status(500).json({
         success: false,
-        message: err.message || "Error general al crear la factura",
+        message: err.message || "General error creating the invoice",
       });
     }
   };
   
 
-
-// Obtener todas las facturas de un usuario
+// Get all invoices for a user
 export const getInvoicesByUser = async (req, res) => {
     try {
         const { userId } = req.params;
 
         const invoices = await Invoice.find({ user: userId })
-            .populate('products.product', 'name price stock');  // Correctamente referenciando 'products.product'
+            .populate('products.product', 'name price stock');  // Correctly referencing 'products.product'
         
         return res.status(200).json({
             success: true,
@@ -76,7 +74,7 @@ export const getInvoicesByUser = async (req, res) => {
         console.error(err);
         return res.status(500).json({
             success: false,
-            message: err.message || "Error al obtener facturas",
+            message: err.message || "Error fetching invoices",
         });
     }
 };
@@ -84,21 +82,21 @@ export const getInvoicesByUser = async (req, res) => {
 export const getInvoiceById = async (req, res) => {
     try {
       const { invoiceId } = req.params;
-      const userId = req.user._id;  // Asegúrate de que este es el ID del usuario autenticado
+      const userId = req.user._id;  // Ensure this is the ID of the authenticated user
   
-      console.log('Request to get invoice with ID:', invoiceId);  // Verificamos que invoiceId llega bien
-      console.log('User ID from JWT:', userId);  // Verificamos que el userId llega bien
+      console.log('Request to get invoice with ID:', invoiceId);  // Check if invoiceId is received correctly
+      console.log('User ID from JWT:', userId);  // Check if userId is received correctly
   
-      // Buscar la factura por ID y también verificar que el usuario que hace la solicitud sea el dueño de la factura
+      // Find the invoice by ID and also check that the user requesting it owns the invoice
       const invoice = await Invoice.findOne({ _id: invoiceId, user: userId })
-        .populate('products.product', 'name price stock'); // Poblar productos correctamente
+        .populate('products.product', 'name price stock'); // Correctly populate products
   
-      console.log('Invoice found:', invoice); // Verificamos si la factura fue encontrada
+      console.log('Invoice found:', invoice); // Check if the invoice was found
   
       if (!invoice) {
         return res.status(404).json({
           success: false,
-          message: "Factura no encontrada o no pertenece a este usuario",
+          message: "Invoice not found or does not belong to this user",
         });
       }
   
@@ -110,77 +108,108 @@ export const getInvoiceById = async (req, res) => {
       console.error(err);
       return res.status(500).json({
         success: false,
-        message: err.message || "Error al obtener la factura",
+        message: err.message || "Error fetching the invoice",
       });
     }
   };
   
-  
-  
 
-// Editar una factura (solo para Admin)
+// Edit an invoice (only for Admin)
 export const updateInvoice = async (req, res) => {
   try {
     const { invoiceId } = req.params;
-    const { products, status } = req.body;
+    const { status, product1, quantity1, product2, quantity2, product3, quantity3 } = req.body;
 
-    // Verificar que el usuario sea Admin (esto debería ser validado en algún middleware de autenticación)
+    // Verify that the user is Admin
     if (req.user.role !== 'ADMIN') {
       return res.status(403).json({
         success: false,
-        message: "Acceso denegado. Solo los administradores pueden editar facturas",
+        message: "Access denied. Only administrators can edit invoices",
       });
     }
 
-    // Validación: Asegurarse de que los productos existan y verificar el stock
-    const productPromises = products.map(async (productId) => {
-      const product = await Product.findById(productId);
-      if (!product) {
-        throw new Error(`Producto con ID ${productId} no encontrado`);
+    // Ensure that at least one product and its quantity are received
+    if ((!product1 || !quantity1) && (!product2 || !quantity2) && (!product3 || !quantity3)) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one product with its quantity must be provided",
+      });
+    }
+
+    // Create an array of products and quantities from the received fields
+    const products = [];
+
+    if (product1 && quantity1) {
+      products.push({ product: product1, quantity: quantity1 });
+    }
+    if (product2 && quantity2) {
+      products.push({ product: product2, quantity: quantity2 });
+    }
+    if (product3 && quantity3) {
+      products.push({ product: product3, quantity: quantity3 });
+    }
+
+    // Product and stock validation
+    const productPromises = products.map(async (productData) => {
+      if (!productData.product || !productData.quantity) {
+        throw new Error("Each product must have a 'product' (ID) and 'quantity'");
       }
+
+      const product = await Product.findById(productData.product);
+      if (!product) {
+        throw new Error(`Product with ID ${productData.product} not found`);
+      }
+
+      if (product.stock < productData.quantity) {
+        throw new Error(`Not enough stock for product ${product.name}`);
+      }
+
       return product;
     });
 
-    const validProducts = await Promise.all(productPromises);
+    // Wait for all products to be validated
+    await Promise.all(productPromises);
 
-    // Validación de stock: Verificar que haya suficiente cantidad de productos en inventario
-    validProducts.forEach((product) => {
-      if (product.stock <= 0) {
-        throw new Error(`No hay stock disponible para el producto ${product.name}`);
-      }
-    });
-
-    // Actualizar la factura
+    // Update the invoice with the products and status
     const updatedInvoice = await Invoice.findByIdAndUpdate(
       invoiceId,
-      { products, status },
-      { new: true }
+      { status, products }, // Update products and status
+      { new: true } // Return the updated document
     );
 
+    // If the invoice is not found
+    if (!updatedInvoice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invoice not found',
+      });
+    }
+
+    // Respond with the updated invoice
     return res.status(200).json({
       success: true,
-      message: "Factura actualizada exitosamente",
+      message: "Invoice updated successfully",
       invoice: updatedInvoice,
     });
   } catch (err) {
     console.error(err);
     return res.status(500).json({
       success: false,
-      message: err.message || "Error al actualizar la factura",
+      message: err.message || "Error updating the invoice",
     });
   }
 };
 
-// Eliminar una factura (solo para Admin)
+// Delete an invoice (only for Admin)
 export const deleteInvoice = async (req, res) => {
   try {
     const { invoiceId } = req.params;
 
-    // Verificar que el usuario sea Admin (esto debería ser validado en algún middleware de autenticación)
+    // Verify that the user is Admin (this should be validated in some authentication middleware)
     if (req.user.role !== 'ADMIN') {
       return res.status(403).json({
         success: false,
-        message: "Acceso denegado. Solo los administradores pueden eliminar facturas",
+        message: "Access denied. Only administrators can delete invoices",
       });
     }
 
@@ -188,31 +217,31 @@ export const deleteInvoice = async (req, res) => {
     if (!invoice) {
       return res.status(404).json({
         success: false,
-        message: "Factura no encontrada",
+        message: "Invoice not found",
       });
     }
 
-    // Devolver stock de los productos
+    // Return stock of the products
     await Promise.all(invoice.products.map(async (item) => {
       const product = await Product.findById(item.product);
       if (product) {
-        product.stock += item.quantity;  // Aumentar el stock
+        product.stock += item.quantity;  // Increase stock
         await product.save();
       }
     }));
 
-    // Eliminar la factura
+    // Delete the invoice
     await Invoice.findByIdAndDelete(invoiceId);
 
     return res.status(200).json({
       success: true,
-      message: "Factura eliminada exitosamente",
+      message: "Invoice deleted successfully",
     });
   } catch (err) {
     console.error(err);
     return res.status(500).json({
       success: false,
-      message: err.message || "Error al eliminar la factura",
+      message: err.message || "Error deleting the invoice",
     });
   }
 };

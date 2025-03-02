@@ -1,10 +1,10 @@
 // Rutas de autenticacion
 import { Router } from "express"
 import { login, register, test } from "./auth.controller.js"
-import { validateJwt } from "../../middlewares/validate.jwt.js";
-import { LoginValidator, registerValidator } from "../../helpers/validators.js";
-import { uploadProfilePicture } from "../../middlewares/multer.uploads.js";
-import { deleteFileError } from "../../middlewares/delete.file.on.errors.js";
+import { validateJwt } from "../../../../arreglar invoice para que funcione en el postman/proyecto-de-bimestre-solo-invoice/middlewares/validate.jwt.js";
+import { LoginValidator, registerValidator } from "../../../../arreglar invoice para que funcione en el postman/proyecto-de-bimestre-solo-invoice/helpers/validators.js";
+import { uploadProfilePicture } from "../../../../arreglar invoice para que funcione en el postman/proyecto-de-bimestre-solo-invoice/middlewares/multer.uploads.js";
+import { deleteFileError } from "../../../../arreglar invoice para que funcione en el postman/proyecto-de-bimestre-solo-invoice/middlewares/delete.file.on.errors.js";
 const api = Router()
 
 // Rutas publicas

@@ -63,32 +63,38 @@ export const updateProduct = async (req, res) => {
         const { productId } = req.params;
         const { name, description, price, stock, categoryId } = req.body;
 
-        // Verificar si la categoría existe
-        const category = await Category.findById(categoryId);
-        if (!category) {
-            return res.status(404).json({ success: false, message: 'Category not found' });
-        }
-
-        const product = await Product.findByIdAndUpdate(
-            productId,
-            { name, description, price, stock, category: categoryId },
-            { new: true }
-        );
-
+        // Verificar si el producto existe antes de actualizarlo
+        const product = await Product.findById(productId);
         if (!product) {
             return res.status(404).json({ success: false, message: 'Product not found' });
         }
 
+        // Si el usuario envía un categoryId, validar si existe
+        if (categoryId) {
+            const category = await Category.findById(categoryId);
+            if (!category) {
+                return res.status(404).json({ success: false, message: 'Category not found' });
+            }
+        }
+
+        // Actualizar el producto con los datos enviados
+        const updatedProduct = await Product.findByIdAndUpdate(
+            productId,
+            { name, description, price, stock, ...(categoryId && { category: categoryId }) },
+            { new: true }
+        );
+
         return res.status(200).json({
             success: true,
             message: 'Product updated successfully',
-            product,
+            product: updatedProduct,
         });
     } catch (err) {
         console.error(err);
         return res.status(500).json({ success: false, message: 'Error updating product', err });
     }
 };
+
 
 // Admin: Eliminar un producto
 export const deleteProduct = async (req, res) => {

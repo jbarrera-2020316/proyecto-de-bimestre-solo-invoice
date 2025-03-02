@@ -1,35 +1,32 @@
 import Category from "../category/category.model.js"
+import Product from '../product/product.model.js' //cambie este import antes era '../category/category.model.js' si no funciona hoy solo cambialo a este jp de lunes
 import mongoose from "mongoose"
 
-export const defaultCategory = async(req,res)=>{
-    try {
-        const categoryExists = await Category.findOne({ defaultCat: true })
- 
-        if(categoryExists){
-            console.log('Default category already exists')
-            return
-        }
- 
-        const category = new Category(
-            {
-                name: 'Default Category',
-                description: 'This is the default category',
-                defaultCat: true,
-            }
-        )
-        await category.save()
-        console.log('Default category create succesfully')
-    } catch(err){
-        console.error(err);
-        return res.status(500).send(
-            {
-                success: false,
-                message: "General error",
-                err,
-            }
-        )
+export const defaultCategory = async () => {
+  try {
+    // Check if the default category already exists
+    const defaultCategory = await Category.findOne({ defaultCat: true });
+
+    if (defaultCategory) {
+      console.log('The default category already exists.');
+      return;  // If it exists, do nothing more
     }
-}
+
+    // If it doesn't exist, create the default category
+    console.log('Creating the default category...');
+
+    const newCategory = new Category({
+      name: 'Default Category',
+      description: 'This is the default category',
+      defaultCat: true, // Ensure this category is the default
+    });
+
+    await newCategory.save(); // Save the new category to the database
+    console.log('Default category created successfully');
+  } catch (error) {
+    console.error('Error creating the default category:', error);
+  }
+};
 
 export const createCategory = async (req, res) => {
     try {
@@ -43,65 +40,89 @@ export const createCategory = async (req, res) => {
       return res.status(500).json({ success: false, message: 'Error adding category', err });
     }
   };
-  
-  // Admin: Editar una categoría
-  export const updateCategory = async (req, res) => {
-    try {
-      const { categoryId } = req.params;
-      const { name, description } = req.body;
-  
-      const category = await Category.findByIdAndUpdate(categoryId, { name, description }, { new: true });
-      if (!category) {
-        return res.status(404).json({ success: false, message: 'Category not found' });
-      }
-  
-      return res.status(200).json({ success: true, message: 'Category updated successfully', category });
-    } catch (err) {
-      return res.status(500).json({ success: false, message: 'Error updating category', err });
-    }
-  };
-  
-  // Admin: Eliminar una categoría y reasignar productos a la categoría predeterminada
-export const deleteCategory = async (req, res) => {
-    try {
-        const { categoryId } = req.params;
 
-        // Buscar la categoría a eliminar
-        const category = await Category.findById(categoryId);
+// Admin: Edit a category
+export const updateCategory = async (req, res) => {
+    try {
+        const { id } = req.params; 
+        const { name, description } = req.body;
+
+        const category = await Category.findByIdAndUpdate(
+            id, 
+            { name, description },
+            { new: true }
+        );
+
         if (!category) {
             return res.status(404).json({ success: false, message: 'Category not found' });
         }
 
-        // Buscar la categoría predeterminada
-        const defaultCategory = await Category.findOne({ defaultCat: true });
-        if (!defaultCategory) {
-            return res.status(404).json({ success: false, message: 'Default category not found' });
-        }
-
-        // Reasignar productos de la categoría a la categoría predeterminada
-        const products = await Product.find({ category: categoryId });
-        if (products.length > 0) {
-            await Product.updateMany(
-                { category: categoryId },
-                { $set: { category: defaultCategory._id } }
-            );
-        }
-
-        // Eliminar la categoría
-        await category.remove();
-
-        return res.status(200).json({
-            success: true,
-            message: 'Category deleted and products reassigned to the default category'
-        });
+        return res.status(200).json({ success: true, message: 'Category updated successfully', category });
     } catch (err) {
-        console.error(err);
-        return res.status(500).json({ success: false, message: 'Error deleting category', err });
+        return res.status(500).json({ success: false, message: 'Error updating category', err });
     }
 };
+
+// Admin: Delete a category and reassign products to the default category
+export const deleteCategory = async (req, res) => {
+    const categoryId = req.params.id;
   
-  // Admin y Usuario: Obtener todas las categorías
-  export const getAllCategory = async (req, res) => {
+    try {
+      // Check if the category exists
+      const category = await Category.findById(categoryId);
+  
+      if (!category) {
+        return res.status(404).json({
+          success: false,
+          message: 'Category not found',
+        });
+      }
+  
+      // Check if it is the default category
+      if (category.defaultCat) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot delete the default category',
+        });
+      }
+  
+      // Find the default category
+      const defaultCategory = await Category.findOne({ defaultCat: true });
+  
+      if (!defaultCategory) {
+        return res.status(404).json({
+          success: false,
+          message: 'Default category not found',
+        });
+      }
+  
+      // Update all products in this category to belong to the default category
+      const updatedProducts = await Product.updateMany(
+        { category: categoryId }, // Filter products by the category we're deleting
+        { $set: { category: defaultCategory._id } } // Replace the category with the default category
+      );
+  
+      console.log(`Updated ${updatedProducts.nModified} products`); // To see how many products were updated
+  
+      // Delete the category
+      await Category.findByIdAndDelete(categoryId);
+  
+      return res.status(200).json({
+        success: true,
+        message: 'Category deleted successfully and products reassigned',
+      });
+    } catch (err) {
+      console.error('Error deleting category:', err);
+      return res.status(500).json({
+        success: false,
+        message: 'Error deleting category',
+        err,
+      });
+    }
+  };
+
+// Admin and User: Get all categories
+export const getAllCategory = async (req, res) => {
     try {
       const categories = await Category.find();
       return res.status(200).json({ success: true, categories });
@@ -110,18 +131,24 @@ export const deleteCategory = async (req, res) => {
     }
   };
 
-  // Admin: Obtener una categoría por su ID
+// Admin: Get a category by its ID
 export const getCategoryById = async (req, res) => {
     try {
-        const { categoryId } = req.params;
+        const { id } = req.params;  // Using 'id' because in the route it's ':id'
+        console.log("received id:", id);  // Check that 'id' is coming correctly
 
-        // Buscar la categoría por ID
-        const category = await Category.findById(categoryId);
+        // Check that the ID is a valid MongoDB ObjectId
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: 'The category ID is not valid' });
+        }
+
+        // Find the category by ID
+        const category = await Category.findById(id);
         if (!category) {
             return res.status(404).json({ success: false, message: 'Category not found' });
         }
 
-        // Devolver la categoría encontrada
+        // Return the found category
         return res.status(200).json({
             success: true,
             category

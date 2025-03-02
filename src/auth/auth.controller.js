@@ -1,7 +1,7 @@
 // Logica de autenticacioin 
-import User from '../user/user.model.js'
-import { checkPassword, encrypt } from '../../utils/encrypt.js'
-import { generateJwt } from '../../utils/jwt.js'
+import User from '../../../../arreglar invoice para que funcione en el postman/proyecto-de-bimestre-solo-invoice/src/user/user.model.js'
+import { checkPassword, encrypt } from '../../../../arreglar invoice para que funcione en el postman/proyecto-de-bimestre-solo-invoice/utils/encrypt.js'
+import { generateJwt } from '../../../../arreglar invoice para que funcione en el postman/proyecto-de-bimestre-solo-invoice/utils/jwt.js'
 
 // Test 
 export const test = (req, res)=>{
